@@ -122,7 +122,9 @@ defmodule Mix.Tasks.PrBody.CheckTest do
     in_temp_repo(fn ->
       write_template!(@template)
 
-      missing_heading = String.replace(@valid_body, "#### Alternatives\n\n- Alternative considered.\n\n", "")
+      missing_heading =
+        String.replace(@valid_body, "#### Alternatives\n\n- Alternative considered.\n\n", "")
+
       File.write!("body.md", missing_heading)
 
       error_output =

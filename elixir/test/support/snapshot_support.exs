@@ -1,4 +1,4 @@
-defmodule SymphonyElixir.TestSupport.Snapshot do
+defmodule Symphony.TestSupport.Snapshot do
   import ExUnit.Assertions
 
   @snapshot_root Path.expand("../fixtures", __DIR__)

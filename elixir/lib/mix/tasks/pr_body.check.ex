@@ -19,7 +19,8 @@ defmodule Mix.Tasks.PrBody.Check do
 
   @impl Mix.Task
   def run(args) do
-    {opts, _argv, invalid} = OptionParser.parse(args, strict: [file: :string, help: :boolean], aliases: [h: :help])
+    {opts, _argv, invalid} =
+      OptionParser.parse(args, strict: [file: :string, help: :boolean], aliases: [h: :help])
 
     cond do
       opts[:help] ->
@@ -117,7 +118,9 @@ defmodule Mix.Tasks.PrBody.Check do
       |> Enum.map(&heading_position(body, &1))
       |> Enum.reject(&(&1 == :nomatch))
 
-    if positions == Enum.sort(positions), do: errors, else: errors ++ ["Required headings are out of order."]
+    if positions == Enum.sort(positions),
+      do: errors,
+      else: errors ++ ["Required headings are out of order."]
   end
 
   defp check_no_placeholders(errors, body) do

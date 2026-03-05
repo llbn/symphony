@@ -1,5 +1,5 @@
-defmodule SymphonyElixir.OrchestratorStatusTest do
-  use SymphonyElixir.TestSupport
+defmodule Symphony.OrchestratorStatusTest do
+  use Symphony.TestSupport
 
   test "snapshot returns :timeout when snapshot server is unresponsive" do
     server_name = Module.concat(__MODULE__, :UnresponsiveSnapshotServer)
@@ -969,7 +969,7 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
     refute rendered =~ "Timestamp:"
   end
 
-  test "status dashboard renders linear project link in header" do
+  test "status dashboard renders gitlab project link in header" do
     snapshot_data =
       {:ok,
        %{
@@ -981,22 +981,22 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
 
     rendered = StatusDashboard.format_snapshot_content_for_test(snapshot_data, 0.0)
 
-    assert rendered =~ "https://linear.app/project/project/issues"
+    assert rendered =~ "https://gitlab.com/api/v4/projects/project/issues"
     refute rendered =~ "Dashboard:"
   end
 
   test "status dashboard renders dashboard url on its own line when server port is configured" do
-    previous_port_override = Application.get_env(:symphony_elixir, :server_port_override)
+    previous_port_override = Application.get_env(:symphony, :server_port_override)
 
     on_exit(fn ->
       if is_nil(previous_port_override) do
-        Application.delete_env(:symphony_elixir, :server_port_override)
+        Application.delete_env(:symphony, :server_port_override)
       else
-        Application.put_env(:symphony_elixir, :server_port_override, previous_port_override)
+        Application.put_env(:symphony, :server_port_override, previous_port_override)
       end
     end)
 
-    Application.put_env(:symphony_elixir, :server_port_override, 4000)
+    Application.put_env(:symphony, :server_port_override, 4000)
 
     snapshot_data =
       {:ok,
@@ -1010,7 +1010,7 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
     rendered = StatusDashboard.format_snapshot_content_for_test(snapshot_data, 0.0)
 
     assert rendered =~ "│ Project:"
-    assert rendered =~ "https://linear.app/project/project/issues"
+    assert rendered =~ "https://gitlab.com/api/v4/projects/project/issues"
     assert rendered =~ "│ Dashboard:"
     assert rendered =~ "http://127.0.0.1:4000/"
   end
@@ -1125,11 +1125,11 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
   test "status dashboard coalesces rapid updates to one render per interval" do
     dashboard_name = Module.concat(__MODULE__, :RenderDashboard)
     parent = self()
-    orchestrator_pid = Process.whereis(SymphonyElixir.Orchestrator)
+    orchestrator_pid = Process.whereis(Symphony.Orchestrator)
 
     on_exit(fn ->
-      if is_nil(Process.whereis(SymphonyElixir.Orchestrator)) do
-        case Supervisor.restart_child(SymphonyElixir.Supervisor, SymphonyElixir.Orchestrator) do
+      if is_nil(Process.whereis(Symphony.Orchestrator)) do
+        case Supervisor.restart_child(Symphony.Supervisor, Symphony.Orchestrator) do
           {:ok, _pid} -> :ok
           {:error, {:already_started, _pid}} -> :ok
         end
@@ -1137,7 +1137,7 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
     end)
 
     if is_pid(orchestrator_pid) do
-      assert :ok = Supervisor.terminate_child(SymphonyElixir.Supervisor, SymphonyElixir.Orchestrator)
+      assert :ok = Supervisor.terminate_child(Symphony.Supervisor, Symphony.Orchestrator)
     end
 
     {:ok, pid} =
@@ -1358,9 +1358,11 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
   test "status dashboard humanizes full codex app-server event set" do
     event_cases = [
       {"turn/started", %{"params" => %{"turn" => %{"id" => "turn-1"}}}, "turn started"},
-      {"turn/completed", %{"params" => %{"turn" => %{"status" => "completed"}}}, "turn completed"},
+      {"turn/completed", %{"params" => %{"turn" => %{"status" => "completed"}}},
+       "turn completed"},
       {"turn/diff/updated", %{"params" => %{"diff" => "line1\nline2"}}, "turn diff updated"},
-      {"turn/plan/updated", %{"params" => %{"plan" => [%{"step" => "a"}, %{"step" => "b"}]}}, "plan updated"},
+      {"turn/plan/updated", %{"params" => %{"plan" => [%{"step" => "a"}, %{"step" => "b"}]}},
+       "plan updated"},
       {"thread/tokenUsage/updated",
        %{
          "params" => %{
@@ -1377,18 +1379,30 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
            }
          }
        }, "item started: command execution"},
-      {"item/completed", %{"params" => %{"item" => %{"type" => "fileChange", "status" => "completed"}}}, "item completed: file change"},
-      {"item/agentMessage/delta", %{"params" => %{"delta" => "hello"}}, "agent message streaming"},
+      {"item/completed",
+       %{"params" => %{"item" => %{"type" => "fileChange", "status" => "completed"}}},
+       "item completed: file change"},
+      {"item/agentMessage/delta", %{"params" => %{"delta" => "hello"}},
+       "agent message streaming"},
       {"item/plan/delta", %{"params" => %{"delta" => "step"}}, "plan streaming"},
-      {"item/reasoning/summaryTextDelta", %{"params" => %{"summaryText" => "thinking"}}, "reasoning summary streaming"},
-      {"item/reasoning/summaryPartAdded", %{"params" => %{"summaryText" => "section"}}, "reasoning summary section added"},
-      {"item/reasoning/textDelta", %{"params" => %{"textDelta" => "reason"}}, "reasoning text streaming"},
-      {"item/commandExecution/outputDelta", %{"params" => %{"outputDelta" => "ok"}}, "command output streaming"},
-      {"item/fileChange/outputDelta", %{"params" => %{"outputDelta" => "changed"}}, "file change output streaming"},
-      {"item/commandExecution/requestApproval", %{"params" => %{"parsedCmd" => "git status"}}, "command approval requested (git status)"},
-      {"item/fileChange/requestApproval", %{"params" => %{"fileChangeCount" => 2}}, "file change approval requested (2 files)"},
-      {"item/tool/call", %{"params" => %{"tool" => "linear_graphql"}}, "dynamic tool call requested (linear_graphql)"},
-      {"item/tool/requestUserInput", %{"params" => %{"question" => "Continue?"}}, "tool requires user input: Continue?"}
+      {"item/reasoning/summaryTextDelta", %{"params" => %{"summaryText" => "thinking"}},
+       "reasoning summary streaming"},
+      {"item/reasoning/summaryPartAdded", %{"params" => %{"summaryText" => "section"}},
+       "reasoning summary section added"},
+      {"item/reasoning/textDelta", %{"params" => %{"textDelta" => "reason"}},
+       "reasoning text streaming"},
+      {"item/commandExecution/outputDelta", %{"params" => %{"outputDelta" => "ok"}},
+       "command output streaming"},
+      {"item/fileChange/outputDelta", %{"params" => %{"outputDelta" => "changed"}},
+       "file change output streaming"},
+      {"item/commandExecution/requestApproval", %{"params" => %{"parsedCmd" => "git status"}},
+       "command approval requested (git status)"},
+      {"item/fileChange/requestApproval", %{"params" => %{"fileChangeCount" => 2}},
+       "file change approval requested (2 files)"},
+      {"item/tool/call", %{"params" => %{"tool" => "gitlab_graphql"}},
+       "dynamic tool call requested (gitlab_graphql)"},
+      {"item/tool/requestUserInput", %{"params" => %{"question" => "Continue?"}},
+       "tool requires user input: Continue?"}
     ]
 
     Enum.each(event_cases, fn {method, payload, expected_fragment} ->
@@ -1405,14 +1419,14 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
     completed = %{
       event: :tool_call_completed,
       message: %{
-        payload: %{"method" => "item/tool/call", "params" => %{"name" => "linear_graphql"}}
+        payload: %{"method" => "item/tool/call", "params" => %{"name" => "gitlab_graphql"}}
       }
     }
 
     failed = %{
       event: :tool_call_failed,
       message: %{
-        payload: %{"method" => "item/tool/call", "params" => %{"tool" => "linear_graphql"}}
+        payload: %{"method" => "item/tool/call", "params" => %{"tool" => "gitlab_graphql"}}
       }
     }
 
@@ -1424,10 +1438,10 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
     }
 
     assert StatusDashboard.humanize_codex_message(completed) =~
-             "dynamic tool call completed (linear_graphql)"
+             "dynamic tool call completed (gitlab_graphql)"
 
     assert StatusDashboard.humanize_codex_message(failed) =~
-             "dynamic tool call failed (linear_graphql)"
+             "dynamic tool call failed (gitlab_graphql)"
 
     assert StatusDashboard.humanize_codex_message(unsupported) =~
              "unsupported dynamic tool call rejected (unknown_tool)"
@@ -1505,7 +1519,7 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
         "method" => "codex/event/agent_reasoning",
         "params" => %{
           "msg" => %{
-            "payload" => %{"summaryText" => "compare retry paths for Linear polling"}
+            "payload" => %{"summaryText" => "compare retry paths for GitLab polling"}
           }
         }
       }
@@ -1532,7 +1546,7 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
     }
 
     assert StatusDashboard.humanize_codex_message(reasoning_message) =~
-             "reasoning update: compare retry paths for Linear polling"
+             "reasoning update: compare retry paths for GitLab polling"
 
     assert StatusDashboard.humanize_codex_message(message_delta) =~
              "agent message streaming: writing workpad reconciliation update"
@@ -1543,7 +1557,7 @@ defmodule SymphonyElixir.OrchestratorStatusTest do
   test "application stop renders offline status" do
     rendered =
       ExUnit.CaptureIO.capture_io(fn ->
-        assert :ok = SymphonyElixir.Application.stop(:normal)
+        assert :ok = Symphony.Application.stop(:normal)
       end)
 
     assert rendered =~ "app_status=offline"

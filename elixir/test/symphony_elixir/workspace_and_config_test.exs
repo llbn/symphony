@@ -1,6 +1,6 @@
-defmodule SymphonyElixir.WorkspaceAndConfigTest do
-  use SymphonyElixir.TestSupport
-  alias SymphonyElixir.Linear.Client
+defmodule Symphony.WorkspaceAndConfigTest do
+  use Symphony.TestSupport
+  alias Symphony.GitLab.Client
 
   test "workspace bootstrap can be implemented in after_create hook" do
     test_root =
@@ -82,7 +82,10 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
       assert File.read!(Path.join(second_workspace, "README.md")) == "changed\n"
       assert File.read!(Path.join(second_workspace, "local-progress.txt")) == "in progress\n"
       assert File.read!(Path.join([second_workspace, "deps", "cache.txt"])) == "cached deps\n"
-      assert File.read!(Path.join([second_workspace, "_build", "artifact.txt"])) == "compiled artifact\n"
+
+      assert File.read!(Path.join([second_workspace, "_build", "artifact.txt"])) ==
+               "compiled artifact\n"
+
       refute File.exists?(Path.join([second_workspace, "tmp", "scratch.txt"]))
     after
       File.rm_rf(workspace_root)
@@ -224,7 +227,9 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
 
     try do
       target_workspace = Path.join(workspace_root, "S_1")
-      untouched_workspace = Path.join(workspace_root, "OTHER-#{System.unique_integer([:positive])}")
+
+      untouched_workspace =
+        Path.join(workspace_root, "OTHER-#{System.unique_integer([:positive])}")
 
       File.mkdir_p!(target_workspace)
       File.mkdir_p!(untouched_workspace)
@@ -257,7 +262,7 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
     assert :ok = Workspace.remove_issue_workspaces(nil)
   end
 
-  test "linear issue helpers" do
+  test "gitlab issue helpers" do
     issue = %Issue{
       id: "abc",
       labels: ["frontend", "infra"],
@@ -269,7 +274,7 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
     refute issue.assigned_to_worker
   end
 
-  test "linear client normalizes blockers from inverse relations" do
+  test "gitlab client normalizes blockers from inverse relations" do
     raw_issue = %{
       "id" => "issue-1",
       "identifier" => "MT-1",
@@ -317,7 +322,7 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
     assert issue.assigned_to_worker
   end
 
-  test "linear client marks explicitly unassigned issues as not routed to worker" do
+  test "gitlab client marks explicitly unassigned issues as not routed to worker" do
     raw_issue = %{
       "id" => "issue-99",
       "identifier" => "MT-99",
@@ -333,7 +338,7 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
     refute issue.assigned_to_worker
   end
 
-  test "linear client pagination merge helper preserves issue ordering" do
+  test "gitlab client pagination merge helper preserves issue ordering" do
     issue_page_1 = [
       %Issue{id: "issue-1", identifier: "MT-1"},
       %Issue{id: "issue-2", identifier: "MT-2"}
@@ -348,10 +353,10 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
     assert Enum.map(merged, & &1.identifier) == ["MT-1", "MT-2", "MT-3"]
   end
 
-  test "linear client logs response bodies for non-200 graphql responses" do
+  test "gitlab client logs response bodies for non-200 graphql responses" do
     log =
       ExUnit.CaptureLog.capture_log(fn ->
-        assert {:error, {:linear_api_status, 400}} =
+        assert {:error, {:gitlab_api_status, 400}} =
                  Client.graphql(
                    "query Viewer { viewer { id } }",
                    %{},
@@ -372,7 +377,7 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
                  )
       end)
 
-    assert log =~ "Linear GraphQL request failed status=400"
+    assert log =~ "GitLab GraphQL request failed status=400"
     assert log =~ ~s(body=%{"errors" => [%{"extensions" => %{"code" => "BAD_USER_INPUT"})
     assert log =~ "Variable \\\"$ids\\\" got invalid value"
   end
@@ -500,7 +505,10 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
              Orchestrator.revalidate_issue_for_dispatch_for_test(stale_issue, fetcher)
 
     assert skipped_issue.identifier == "MT-1005"
-    assert skipped_issue.blocked_by == [%{id: "blocker-3", identifier: "MT-1006", state: "In Progress"}]
+
+    assert skipped_issue.blocked_by == [
+             %{id: "blocker-3", identifier: "MT-1006", state: "In Progress"}
+           ]
   end
 
   test "workspace remove returns error information for missing directory" do
@@ -529,7 +537,8 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
 
       write_workflow_file!(Workflow.workflow_file_path(),
         workspace_root: workspace_root,
-        hook_after_create: "echo after_create > after_create.log\necho call >> \"#{after_create_counter}\"",
+        hook_after_create:
+          "echo after_create > after_create.log\necho call >> \"#{after_create_counter}\"",
         hook_before_remove: "echo before_remove > \"#{before_remove_marker}\""
       )
 
@@ -601,17 +610,17 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
   end
 
   test "workspace remove continues when before_remove hook times out" do
-    previous_timeout = Application.get_env(:symphony_elixir, :workspace_hook_timeout_ms)
+    previous_timeout = Application.get_env(:symphony, :workspace_hook_timeout_ms)
 
     on_exit(fn ->
       if is_nil(previous_timeout) do
-        Application.delete_env(:symphony_elixir, :workspace_hook_timeout_ms)
+        Application.delete_env(:symphony, :workspace_hook_timeout_ms)
       else
-        Application.put_env(:symphony_elixir, :workspace_hook_timeout_ms, previous_timeout)
+        Application.put_env(:symphony, :workspace_hook_timeout_ms, previous_timeout)
       end
     end)
 
-    Application.put_env(:symphony_elixir, :workspace_hook_timeout_ms, 10)
+    Application.put_env(:symphony, :workspace_hook_timeout_ms, 10)
 
     test_root =
       Path.join(
@@ -638,9 +647,9 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
   end
 
   test "config reads defaults for optional settings" do
-    previous_linear_api_key = System.get_env("LINEAR_API_KEY")
-    on_exit(fn -> restore_env("LINEAR_API_KEY", previous_linear_api_key) end)
-    System.delete_env("LINEAR_API_KEY")
+    previous_gitlab_api_key = System.get_env("GITLAB_API_KEY")
+    on_exit(fn -> restore_env("GITLAB_API_KEY", previous_gitlab_api_key) end)
+    System.delete_env("GITLAB_API_KEY")
 
     write_workflow_file!(Workflow.workflow_file_path(),
       workspace_root: nil,
@@ -652,12 +661,13 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
       codex_read_timeout_ms: nil,
       codex_stall_timeout_ms: nil,
       tracker_api_token: nil,
+      tracker_project_id: nil,
       tracker_project_slug: nil
     )
 
-    assert Config.linear_endpoint() == "https://api.linear.app/graphql"
-    assert Config.linear_api_token() == nil
-    assert Config.linear_project_slug() == nil
+    assert Config.gitlab_endpoint() == "https://gitlab.com/api/v4"
+    assert Config.gitlab_api_token() == nil
+    assert Config.gitlab_project_slug() == nil
     assert Config.workspace_root() == Path.join(System.tmp_dir!(), "symphony_workspaces")
     assert Config.max_concurrent_agents() == 10
     assert Config.codex_command() == "codex app-server"
@@ -685,13 +695,19 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
     assert Config.codex_read_timeout_ms() == 5_000
     assert Config.codex_stall_timeout_ms() == 300_000
 
-    write_workflow_file!(Workflow.workflow_file_path(), codex_command: "codex app-server --model gpt-5.3-codex")
+    write_workflow_file!(Workflow.workflow_file_path(),
+      codex_command: "codex app-server --model gpt-5.3-codex"
+    )
+
     assert Config.codex_command() == "codex app-server --model gpt-5.3-codex"
 
     write_workflow_file!(Workflow.workflow_file_path(),
       codex_approval_policy: "on-request",
       codex_thread_sandbox: "workspace-write",
-      codex_turn_sandbox_policy: %{type: "workspaceWrite", writableRoots: ["/tmp/workspace", "/tmp/cache"]}
+      codex_turn_sandbox_policy: %{
+        type: "workspaceWrite",
+        writableRoots: ["/tmp/workspace", "/tmp/cache"]
+      }
     )
 
     assert Config.codex_approval_policy() == "on-request"
@@ -703,7 +719,7 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
            }
 
     write_workflow_file!(Workflow.workflow_file_path(), tracker_active_states: ",")
-    assert Config.linear_active_states() == ["Todo", "In Progress"]
+    assert Config.gitlab_active_states() == ["opened"]
 
     write_workflow_file!(Workflow.workflow_file_path(), max_concurrent_agents: "bad")
     assert Config.max_concurrent_agents() == 10
@@ -732,8 +748,8 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
       server_host: 123
     )
 
-    assert Config.linear_active_states() == ["Todo", "In Progress"]
-    assert Config.linear_terminal_states() == ["Closed", "Cancelled", "Canceled", "Duplicate", "Done"]
+    assert Config.gitlab_active_states() == ["opened"]
+    assert Config.gitlab_terminal_states() == ["closed"]
     assert Config.poll_interval_ms() == 30_000
     assert Config.workspace_root() == Path.join(System.tmp_dir!(), "symphony_workspaces")
     assert Config.max_retry_backoff_ms() == 300_000
@@ -801,7 +817,7 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
 
   test "config resolves $VAR references for env-backed secret and path values" do
     workspace_env_var = "SYMP_WORKSPACE_ROOT_#{System.unique_integer([:positive])}"
-    api_key_env_var = "SYMP_LINEAR_API_KEY_#{System.unique_integer([:positive])}"
+    api_key_env_var = "SYMP_GITLAB_API_KEY_#{System.unique_integer([:positive])}"
     workspace_root = Path.join("/tmp", "symphony-workspace-root")
     api_key = "resolved-secret"
     codex_bin = Path.join(["~", "bin", "codex"])
@@ -823,14 +839,14 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
       codex_command: "#{codex_bin} app-server"
     )
 
-    assert Config.linear_api_token() == api_key
+    assert Config.gitlab_api_token() == api_key
     assert Config.workspace_root() == Path.expand(workspace_root)
     assert Config.codex_command() == "#{codex_bin} app-server"
   end
 
   test "config no longer resolves legacy env: references" do
     workspace_env_var = "SYMP_WORKSPACE_ROOT_#{System.unique_integer([:positive])}"
-    api_key_env_var = "SYMP_LINEAR_API_KEY_#{System.unique_integer([:positive])}"
+    api_key_env_var = "SYMP_GITLAB_API_KEY_#{System.unique_integer([:positive])}"
     workspace_root = Path.join("/tmp", "symphony-workspace-root")
     api_key = "resolved-secret"
 
@@ -850,7 +866,7 @@ defmodule SymphonyElixir.WorkspaceAndConfigTest do
       workspace_root: "env:#{workspace_env_var}"
     )
 
-    assert Config.linear_api_token() == "env:#{api_key_env_var}"
+    assert Config.gitlab_api_token() == "env:#{api_key_env_var}"
     assert Config.workspace_root() == "env:#{workspace_env_var}"
   end
 

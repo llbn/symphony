@@ -1,7 +1,7 @@
-defmodule SymphonyElixir.SpecsCheckTest do
+defmodule Symphony.SpecsCheckTest do
   use ExUnit.Case, async: true
 
-  alias SymphonyElixir.SpecsCheck
+  alias Symphony.SpecsCheck
 
   test "reports missing @spec for public functions" do
     dir = create_tmp_dir()

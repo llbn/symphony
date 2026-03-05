@@ -65,7 +65,13 @@ defmodule Mix.Tasks.Specs.CheckTaskTest do
 
       output =
         capture_io(fn ->
-          assert :ok = Check.run(["--paths", "lib", "--exemptions-file", "config/specs_exemptions.txt"])
+          assert :ok =
+                   Check.run([
+                     "--paths",
+                     "lib",
+                     "--exemptions-file",
+                     "config/specs_exemptions.txt"
+                   ])
         end)
 
       assert output =~ "specs.check: all public functions have @spec or exemption"
@@ -91,7 +97,12 @@ defmodule Mix.Tasks.Specs.CheckTaskTest do
   end
 
   defp in_temp_project(fun) do
-    root = Path.join(System.tmp_dir!(), "specs-check-task-test-#{System.unique_integer([:positive, :monotonic])}")
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "specs-check-task-test-#{System.unique_integer([:positive, :monotonic])}"
+      )
+
     original_cwd = File.cwd!()
 
     File.rm_rf!(root)

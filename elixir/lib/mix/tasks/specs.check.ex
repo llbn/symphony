@@ -1,7 +1,7 @@
 defmodule Mix.Tasks.Specs.Check do
   use Mix.Task
 
-  alias SymphonyElixir.SpecsCheck
+  alias Symphony.SpecsCheck
 
   @moduledoc """
   Enforces adjacent `@spec` declarations for public APIs in `lib/`.
@@ -31,7 +31,9 @@ defmodule Mix.Tasks.Specs.Check do
       :ok
     else
       Enum.each(findings, fn finding ->
-        Mix.shell().error("#{finding.file}:#{finding.line} missing @spec for #{SpecsCheck.finding_identifier(finding)}")
+        Mix.shell().error(
+          "#{finding.file}:#{finding.line} missing @spec for #{SpecsCheck.finding_identifier(finding)}"
+        )
       end)
 
       Mix.raise("specs.check failed with #{length(findings)} missing @spec declaration(s)")

@@ -1,7 +1,7 @@
-defmodule SymphonyElixir.StatusDashboardSnapshotTest do
-  use SymphonyElixir.TestSupport
+defmodule Symphony.StatusDashboardSnapshotTest do
+  use Symphony.TestSupport
 
-  alias SymphonyElixir.TestSupport.Snapshot
+  alias Symphony.TestSupport.Snapshot
 
   @terminal_columns 115
 
@@ -19,17 +19,17 @@ defmodule SymphonyElixir.StatusDashboardSnapshotTest do
   end
 
   test "snapshot fixture: idle dashboard with observability url" do
-    previous_port_override = Application.get_env(:symphony_elixir, :server_port_override)
+    previous_port_override = Application.get_env(:symphony, :server_port_override)
 
     on_exit(fn ->
       if is_nil(previous_port_override) do
-        Application.delete_env(:symphony_elixir, :server_port_override)
+        Application.delete_env(:symphony, :server_port_override)
       else
-        Application.put_env(:symphony_elixir, :server_port_override, previous_port_override)
+        Application.put_env(:symphony, :server_port_override, previous_port_override)
       end
     end)
 
-    Application.put_env(:symphony_elixir, :server_port_override, 4000)
+    Application.put_env(:symphony, :server_port_override, 4000)
 
     snapshot_data =
       {:ok,
@@ -40,7 +40,10 @@ defmodule SymphonyElixir.StatusDashboardSnapshotTest do
          rate_limits: nil
        }}
 
-    Snapshot.assert_dashboard_snapshot!("idle_with_dashboard_url", render_snapshot(snapshot_data, 0.0))
+    Snapshot.assert_dashboard_snapshot!(
+      "idle_with_dashboard_url",
+      render_snapshot(snapshot_data, 0.0)
+    )
   end
 
   test "snapshot fixture: super busy dashboard" do
@@ -126,7 +129,12 @@ defmodule SymphonyElixir.StatusDashboardSnapshotTest do
              error: "fourth queued retry should also render after removing the top-three limit"
            })
          ],
-         codex_totals: %{input_tokens: 18_000, output_tokens: 2_200, total_tokens: 20_200, seconds_running: 2_700},
+         codex_totals: %{
+           input_tokens: 18_000,
+           output_tokens: 2_200,
+           total_tokens: 20_200,
+           seconds_running: 2_700
+         },
          rate_limits: %{
            limit_id: "gpt-5",
            primary: %{remaining: 0, limit: 20_000, reset_in_seconds: 95},
@@ -182,7 +190,12 @@ defmodule SymphonyElixir.StatusDashboardSnapshotTest do
            })
          ],
          retrying: [],
-         codex_totals: %{input_tokens: 90, output_tokens: 12, total_tokens: 102, seconds_running: 75},
+         codex_totals: %{
+           input_tokens: 90,
+           output_tokens: 12,
+           total_tokens: 102,
+           seconds_running: 75
+         },
          rate_limits: %{
            limit_id: "priority-tier",
            primary: %{remaining: 100, limit: 100, reset_in_seconds: 1},

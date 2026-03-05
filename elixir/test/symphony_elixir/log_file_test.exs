@@ -1,7 +1,7 @@
-defmodule SymphonyElixir.LogFileTest do
+defmodule Symphony.LogFileTest do
   use ExUnit.Case, async: true
 
-  alias SymphonyElixir.LogFile
+  alias Symphony.LogFile
 
   test "default_log_file/0 uses the current working directory" do
     assert LogFile.default_log_file() == Path.join(File.cwd!(), "log/symphony.log")

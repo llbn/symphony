@@ -101,12 +101,14 @@ defmodule Mix.Tasks.Workspace.BeforeRemove do
       {:error, {status, output}} ->
         trimmed_output = String.trim(output)
 
-        Mix.shell().error("Failed to close PR ##{pr_number} for branch #{branch}: exit #{status}#{format_output(trimmed_output)}")
+        Mix.shell().error(
+          "Failed to close PR ##{pr_number} for branch #{branch}: exit #{status}#{format_output(trimmed_output)}"
+        )
     end
   end
 
   defp closing_comment(branch) do
-    "Closing because the Linear issue for branch #{branch} entered a terminal state without merge."
+    "Closing because the GitLab issue for branch #{branch} entered a terminal state without merge."
   end
 
   defp format_output(""), do: ""
