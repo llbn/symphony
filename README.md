@@ -6,7 +6,8 @@ This repository contains a GitLab-adapted Symphony implementation aligned to [`S
 
 - `SPEC.md`: Symphony service specification
 - `elixir/`: Elixir/OTP implementation of the GitLab-backed orchestrator
-- `.github/`: CI and repo automation
+- `.gitlab-ci.yml`: GitLab CI pipeline (`make all` + MR description lint)
+- `.gitlab/merge_request_templates/`: merge request description templates
 
 ## Elixir implementation
 

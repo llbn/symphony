@@ -10,9 +10,9 @@ defmodule Symphony.TestSupport do
       alias Symphony.CLI
       alias Symphony.Codex.AppServer
       alias Symphony.Config
-      alias Symphony.HttpServer
       alias Symphony.GitLab.Client
       alias Symphony.GitLab.Issue
+      alias Symphony.HttpServer
       alias Symphony.Orchestrator
       alias Symphony.PromptBuilder
       alias Symphony.StatusDashboard

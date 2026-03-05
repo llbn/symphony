@@ -11,25 +11,22 @@ description:
 ## Goals
 
 - Find why a run is stuck, retrying, or failing.
-- Correlate Linear issue identity to a Codex session quickly.
+- Correlate GitLab issue identity to a Codex session quickly.
 - Read the right logs in the right order to isolate root cause.
 
 ## Log Sources
 
 - Primary runtime log: `log/symphony.log`
-  - Default comes from `SymphonyElixir.LogFile` (`log/symphony.log`).
+  - Default runtime file is `log/symphony.log`.
   - Includes orchestrator, agent runner, and Codex app-server lifecycle logs.
 - Rotated runtime logs: `log/symphony.log*`
   - Check these when the relevant run is older.
 
 ## Correlation Keys
 
-- `issue_identifier`: human ticket key (example: `MT-625`)
-- `issue_id`: Linear UUID (stable internal ID)
+- `issue_identifier`: GitLab issue reference (example: `group/project#123` or `#123`)
+- `issue_id`: GitLab issue IID value as a string (example: `123`)
 - `session_id`: Codex thread-turn pair (`<thread_id>-<turn_id>`)
-
-`elixir/docs/logging.md` requires these fields for issue/session lifecycle logs. Use
-them as your join keys during debugging.
 
 ## Quick Triage (Stuck Run)
 
@@ -45,10 +42,10 @@ them as your join keys during debugging.
 
 ```bash
 # 1) Narrow by ticket key (fastest entry point)
-rg -n "issue_identifier=MT-625" log/symphony.log*
+rg -n "issue_identifier=.*#123" log/symphony.log*
 
-# 2) If needed, narrow by Linear UUID
-rg -n "issue_id=<linear-uuid>" log/symphony.log*
+# 2) If needed, narrow by GitLab issue IID
+rg -n "issue_id=123" log/symphony.log*
 
 # 3) Pull session IDs seen for that ticket
 rg -o "session_id=[^ ;]+" log/symphony.log* | sort -u
@@ -114,5 +111,5 @@ concurrent runs.
 
 - Prefer `rg` over `grep` for speed on large logs.
 - Check rotated logs (`log/symphony.log*`) before concluding data is missing.
-- If required context fields are missing in new log statements, align with
-  `elixir/docs/logging.md` conventions.
+- If required context fields are missing in new log statements, keep
+  `issue_identifier`, `issue_id`, and `session_id` together in lifecycle logs.

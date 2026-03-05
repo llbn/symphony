@@ -205,27 +205,32 @@ defmodule Symphony.GitLab.Client do
   end
 
   defp fetch_issue_pages_by_iids(issue_iids, assignee_filter) do
-    with {:ok, project_id} <- require_gitlab_project_id() do
-      issue_iids
-      |> Enum.chunk_every(@page_size)
-      |> Enum.reduce_while({:ok, []}, fn issue_iid_chunk, {:ok, acc} ->
-        params =
-          Enum.map(issue_iid_chunk, &{"iids[]", &1}) ++
-            [{"state", "all"}] ++
-            assignee_filter_query_params(assignee_filter)
+    case require_gitlab_project_id() do
+      {:ok, project_id} ->
+        issue_iids
+        |> Enum.chunk_every(@page_size)
+        |> Enum.reduce_while({:ok, []}, fn issue_iid_chunk, {:ok, acc} ->
+          fetch_issue_iid_chunk(project_id, issue_iid_chunk, assignee_filter, acc)
+        end)
+        |> flatten_page_result()
 
-        case paginate_get(project_issues_path(project_id), params) do
-          {:ok, pages} ->
-            {:cont, {:ok, [pages | acc]}}
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 
-          {:error, reason} ->
-            {:halt, {:error, reason}}
-        end
-      end)
-      |> case do
-        {:ok, pages} -> {:ok, pages |> Enum.reverse() |> List.flatten()}
-        {:error, reason} -> {:error, reason}
-      end
+  defp fetch_issue_iid_chunk(project_id, issue_iid_chunk, assignee_filter, acc) do
+    params =
+      Enum.map(issue_iid_chunk, &{"iids[]", &1}) ++
+        [{"state", "all"}] ++
+        assignee_filter_query_params(assignee_filter)
+
+    case paginate_get(project_issues_path(project_id), params) do
+      {:ok, pages} ->
+        {:cont, {:ok, [pages | acc]}}
+
+      {:error, reason} ->
+        {:halt, {:error, reason}}
     end
   end
 
@@ -429,7 +434,7 @@ defmodule Symphony.GitLab.Client do
 
   defp normalize_state(_state), do: ""
 
-  defp assignee_filter() do
+  defp assignee_filter do
     case Config.gitlab_assignee() do
       nil ->
         {:ok, nil}
@@ -617,51 +622,50 @@ defmodule Symphony.GitLab.Client do
   defp extract_embedded_blockers(issue_payload) when is_map(issue_payload) do
     issue_payload
     |> Map.get("inverseRelations")
-    |> case do
-      %{"nodes" => relations} when is_list(relations) ->
-        relations
-        |> Enum.flat_map(fn
-          %{"type" => relation_type, "issue" => blocker_issue}
-          when is_binary(relation_type) and is_map(blocker_issue) ->
-            if normalize_state(relation_type) == "blocks" do
-              blocker_iid = normalize_issue_iid(blocker_issue["iid"] || blocker_issue["id"])
-
-              if is_nil(blocker_iid) do
-                []
-              else
-                [
-                  %{
-                    id: blocker_iid,
-                    identifier: normalize_text(blocker_issue["identifier"]) || "##{blocker_iid}",
-                    state: normalize_issue_state_value(blocker_issue["state"])
-                  }
-                ]
-              end
-            else
-              []
-            end
-
-          _ ->
-            []
-        end)
-
-      _ ->
-        []
-    end
+    |> relation_nodes()
+    |> Enum.flat_map(&relation_to_blockers/1)
   end
 
   defp extract_embedded_blockers(_issue_payload), do: []
 
+  defp relation_nodes(%{"nodes" => relations}) when is_list(relations), do: relations
+  defp relation_nodes(_relations), do: []
+
+  defp relation_to_blockers(%{"type" => relation_type, "issue" => blocker_issue})
+       when is_binary(relation_type) and is_map(blocker_issue) do
+    if normalize_state(relation_type) == "blocks" do
+      build_embedded_blocker(blocker_issue)
+    else
+      []
+    end
+  end
+
+  defp relation_to_blockers(_relation), do: []
+
+  defp build_embedded_blocker(blocker_issue) do
+    case normalize_issue_iid(blocker_issue["iid"] || blocker_issue["id"]) do
+      nil ->
+        []
+
+      blocker_iid ->
+        [
+          %{
+            id: blocker_iid,
+            identifier: normalize_text(blocker_issue["identifier"]) || "##{blocker_iid}",
+            state: normalize_issue_state_value(blocker_issue["state"])
+          }
+        ]
+    end
+  end
+
   defp blocker_identifier(link_payload, blocker_iid) do
     references = Map.get(link_payload, "references")
 
-    cond do
-      is_map(references) and is_binary(references["full"]) and
-          String.trim(references["full"]) != "" ->
-        String.trim(references["full"])
-
-      true ->
-        "##{blocker_iid}"
+    if is_map(references) and is_binary(references["full"]) and
+         String.trim(references["full"]) != "" do
+      String.trim(references["full"])
+    else
+      "##{blocker_iid}"
     end
   end
 
@@ -756,14 +760,15 @@ defmodule Symphony.GitLab.Client do
   defp request(method, path, opts) when is_atom(method) and is_binary(path) and is_list(opts) do
     request_fun = Application.get_env(:symphony, :gitlab_request_fun)
 
-    cond do
-      is_function(request_fun, 3) ->
-        request_fun.(method, path, opts)
-
-      true ->
-        do_request(method, path, opts)
+    if is_function(request_fun, 3) do
+      request_fun.(method, path, opts)
+    else
+      do_request(method, path, opts)
     end
   end
+
+  defp flatten_page_result({:ok, pages}), do: {:ok, pages |> Enum.reverse() |> List.flatten()}
+  defp flatten_page_result({:error, reason}), do: {:error, reason}
 
   defp do_request(method, path, opts) do
     with {:ok, token} <- require_gitlab_token() do

@@ -1,0 +1,42 @@
+image: elixir:1.19
+
+stages:
+  - lint
+  - verify
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - when: never
+
+default:
+  cache:
+    key:
+      files:
+        - elixir/mix.lock
+    paths:
+      - elixir/deps/
+      - elixir/_build/
+    policy: pull-push
+  before_script:
+    - cd elixir
+    - mix local.hex --force
+    - mix local.rebar --force
+    - mix deps.get
+
+pr_description_lint:
+  stage: lint
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - printf '%s' "${CI_MERGE_REQUEST_DESCRIPTION:-}" > /tmp/mr_body.md
+    - mix pr_body.check --file /tmp/mr_body.md
+
+make_all:
+  stage: verify
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - make all

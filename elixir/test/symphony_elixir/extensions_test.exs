@@ -1,8 +1,8 @@
 defmodule Symphony.ExtensionsTest do
   use Symphony.TestSupport
 
-  alias Symphony.HttpServer.State, as: HttpServerState
   alias Symphony.GitLab.Adapter
+  alias Symphony.HttpServer.State, as: HttpServerState
   alias Symphony.Tracker.Memory
 
   defmodule FakeGitLabClient do
